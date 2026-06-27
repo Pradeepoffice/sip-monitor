@@ -27,18 +27,16 @@ async function fetchCDR() {
 
     const url = `https://${subdomain}/v1/Accounts/${accountSid}/Calls.json`;
 
-    const res = await axios.get(url, {
-      params: {
-        PageSize: 500,
-        SortBy: "DateCreated:desc",
-        DateCreated: dateFilter,
-      },
-      auth: {
-        username: apiKey,
-        password: apiToken,
-      },
-      timeout: 15000,
-    });
+   // Build query string manually to avoid axios encoding issues
+const queryString = `PageSize=500&SortBy=DateCreated:desc&DateCreated=${encodeURIComponent(dateFilter)}`;
+
+const res = await axios.get(`${url}?${queryString}`, {
+  auth: {
+    username: apiKey,
+    password: apiToken,
+  },
+  timeout: 15000,
+});
 
     const calls = res.data?.Calls || [];
 
