@@ -20,11 +20,17 @@ async function fetchCDR() {
 
   try {
     // Build today's date range
-    const now      = new Date();
-    const tomorrow = new Date(now);
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    const fmt = (d) => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
-    const dateFilter = `gte:${fmt(now)} 00:00:00;lte:${fmt(tomorrow)} 00:00:00`;
+    // Convert to IST (UTC+5:30)
+const now = new Date();
+const istOffset = 5.5 * 60 * 60 * 1000; // 5hrs 30mins in ms
+const istNow = new Date(now.getTime() + istOffset);
+const istTomorrow = new Date(istNow);
+istTomorrow.setDate(istTomorrow.getDate() + 1);
+
+const fmt = (d) => `${d.getUTCFullYear()}-${pad(d.getUTCMonth()+1)}-${pad(d.getUTCDate())}`;
+const dateFilter = `gte:${fmt(istNow)} 00:00:00;lte:${fmt(istTomorrow)} 00:00:00`;
+
+console.log(`[CDR] Fetching calls for IST date: ${fmt(istNow)}`);
 
     const baseUrl = `https://${subdomain}/v1/Accounts/${accountSid}/Calls.json`;
     const auth    = { username: apiKey, password: apiToken };
