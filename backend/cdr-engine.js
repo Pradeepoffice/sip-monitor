@@ -20,13 +20,24 @@ async function fetchCDR() {
 
   try {
     // Fetch last 500 calls sorted by latest first
-    const url = `https://${apiKey}:${apiToken}@${subdomain}/v1/Accounts/${accountSid}/Calls.json`;
-    const params = {
-      PageSize: 500,
-      SortBy: "DateCreated:desc",
-    };
+    // Get today's date range in IST
+const now = new Date();
+const todayStart = new Date(now);
+todayStart.setHours(0, 0, 0, 0);
+const pad = (n) => String(n).padStart(2, "0");
+const fmtDate = (d) =>
+  `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
 
-    const res = await axios.get(url, { params, timeout: 15000 });
+const dateFilter = `gte:${fmtDate(todayStart)}`;
+
+const url = `https://${apiKey}:${apiToken}@${subdomain}/v1/Accounts/${accountSid}/Calls.json`;
+const params = {
+  PageSize: 500,
+  SortBy: "DateCreated:desc",
+  DateCreated: dateFilter,
+};
+
+const res = await axios.get(url, { params, timeout: 15000 });
     const calls = res.data?.Calls || [];
 
     allCalls = calls.map((c) => ({
