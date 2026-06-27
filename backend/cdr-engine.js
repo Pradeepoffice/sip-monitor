@@ -28,7 +28,7 @@ async function fetchCDR() {
     const url = `https://${subdomain}/v1/Accounts/${accountSid}/Calls.json`;
 
    // Build query string manually to avoid axios encoding issues
-const queryString = `PageSize=500&SortBy=DateCreated:desc&DateCreated=${encodeURIComponent(dateFilter)}`;
+const queryString = `PageSize=100&SortBy=DateCreated:desc&DateCreated=${encodeURIComponent(dateFilter)}`;
 
 const res = await axios.get(`${url}?${queryString}`, {
   auth: {
