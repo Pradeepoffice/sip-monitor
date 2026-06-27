@@ -23,7 +23,7 @@ async function fetchCDR() {
     const tomorrow = new Date(now);
     tomorrow.setDate(tomorrow.getDate() + 1);
     const fmt = (d) => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
-    const dateFilter = `gte:${fmt(now)}+00:00:00;lte:${fmt(tomorrow)}+00:00:00`;
+    const dateFilter = `gte:${fmt(now)} 00:00:00;lte:${fmt(tomorrow)} 00:00:00`;
 
     const url = `https://${subdomain}/v1/Accounts/${accountSid}/Calls.json`;
 
