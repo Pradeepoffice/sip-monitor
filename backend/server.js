@@ -56,24 +56,16 @@ async function runCDRCheck() {
 const SIP_INTERVAL  = parseInt(process.env.CHECK_INTERVAL || "30") * 1000;
 const CDR_INTERVAL  = parseInt(process.env.CDR_INTERVAL   || "300") * 1000; // 5 mins
 
-setInterval(() => sipEndpoints.forEach(checkSipEndpoint), SIP_INTERVAL);
 setInterval(runCDRCheck, CDR_INTERVAL);
 
 // Startup
-sipEndpoints.forEach(checkSipEndpoint);
 runCDRCheck();
 
 // ─── REST APIs ────────────────────────────────────────────────────────────
 
 // SIP status
 app.get("/api/sip/status", (req, res) => {
-  res.json({
-    endpoints: sipEndpoints.map((ep) => ({
-      ...ep, ...sipResults[ep.id],
-      history: (sipHistory[ep.id] || []).slice(-30),
-      uptime: calcUptime(ep.id),
-    })),
-  });
+  res.json({ endpoints: [] });
 });
 
 // CDR stats — all modules in one call
