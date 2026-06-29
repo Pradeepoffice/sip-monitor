@@ -166,7 +166,6 @@ export default function App() {
       <div style={{ borderBottom: `1px solid ${C.border}`, padding: "10px 28px", background: "#0b1422", display: "flex", gap: 6, overflowX: "auto" }}>
         {[
           ["overview",    "📊 Overview"],
-          ["sip",         "📡 SIP Gateway"],
           ["clients",     "🏢 Clients"],
           ["did",         "📱 DID Health"],
           ["hourly",      "⏱ Hourly Traffic"],
