@@ -196,11 +196,12 @@ function OverviewTab({ ov }) {
         <KPICard label="Connected"         value={num(ov.connected)}     color={C.green}  icon="✅" sub={`${pct(ov.connectivity)} connectivity`} />
         <KPICard label="Failed"            value={num(ov.failed)}        color={C.red}    icon="❌" sub="failed + busy + no-answer" />
       </div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 14, marginBottom: 20 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(5,1fr)", gap: 14, marginBottom: 20 }}>
         <KPICard label="Inbound"      value={num(ov.inbound)}        color={C.blue}   icon="📥" />
         <KPICard label="Outbound"     value={num(ov.outbound)}       color={C.purple} icon="📤" />
         <KPICard label="In Progress"  value={num(ov.inProgress)}     color={C.yellow} icon="🔄" />
         <KPICard label="Live Voicebot Calls" value={num(ov.liveActive)} color={C.purple} icon="🤖" sub={ov.liveLimit ? `${ov.liveUtilization}% of ${ov.liveLimit} capacity` : ""} />
+        <KPICard label="Total Cost"   value={`₹${num(ov.totalCost)}`} color={C.green}  icon="💰" sub={`₹${ov.avgCostPerCall} avg/call`} />
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
         <Card>
