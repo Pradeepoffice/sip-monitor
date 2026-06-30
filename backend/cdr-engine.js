@@ -343,5 +343,48 @@ function getAllStats() {
     fetchError,
   };
 }
+// ─── Live Voicebot Streams ─────────────────────────────────────────────────
+let liveStreamData = { active: 0, limit: 0, utilization: 0, lastChecked: null, error: null };
+
+async function fetchActiveStreams() {
+  const accountSid = process.env.EXOTEL_ACCOUNT_SID;
+  const apiKey     = process.env.EXOTEL_API_KEY;
+  const apiToken   = process.env.EXOTEL_API_TOKEN;
+  const subdomain  = process.env.EXOTEL_SUBDOMAIN || "api.in.exotel.com";
+
+  if (!accountSid || !apiKey || !apiToken) return;
+
+  try {
+    const url = `https://${subdomain}/v1/Accounts/${accountSid}/ActiveStreams`;
+    const res = await axios.get(url, {
+      auth: { username: apiKey, password: apiToken },
+      timeout: 10000,
+    });
+
+    const xml = res.data;
+    const activeMatch = xml.match(/<ActiveStreamCount>(\d+)<\/ActiveStreamCount>/);
+    const limitMatch  = xml.match(/<ThrottleLimit>(\d+)<\/ThrottleLimit>/);
+
+    const active = activeMatch ? parseInt(activeMatch[1]) : 0;
+    const limit  = limitMatch  ? parseInt(limitMatch[1])  : 0;
+
+    liveStreamData = {
+      active,
+      limit,
+      utilization: limit ? parseFloat(((active / limit) * 100).toFixed(1)) : 0,
+      lastChecked: new Date().toISOString(),
+      error: null,
+    };
+
+    console.log(`[STREAMS] Active: ${active} / ${limit} (${liveStreamData.utilization}%)`);
+  } catch (err) {
+    liveStreamData.error = err.message;
+    console.error("[STREAMS] Fetch failed:", err.message);
+  }
+}
+
+function getLiveStreams() {
+  return liveStreamData;
+}
 
 module.exports = { fetchCDR, getAllStats, getOverview, checkAlertConditions };
