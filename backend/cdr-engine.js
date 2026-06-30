@@ -7,97 +7,117 @@ let fetchError   = null;
 let totalFetched = 0;
 
 async function fetchCDR() {
-  const accountSid = process.env.EXOTEL_ACCOUNT_SID;
-  const apiKey     = process.env.EXOTEL_API_KEY;
-  const apiToken   = process.env.EXOTEL_API_TOKEN;
-  const subdomain  = process.env.EXOTEL_SUBDOMAIN || "api.in.exotel.com";
-
-  if (!accountSid || !apiKey || !apiToken) {
-    console.log("[CDR] Credentials not set — skipping.");
+  const accountsRaw = process.env.EXOTEL_ACCOUNTS || "";
+  if (!accountsRaw) {
+    console.log("[CDR] EXOTEL_ACCOUNTS not set — skipping.");
     return;
   }
 
-  try {
-    const now         = new Date();
-    const istOffset   = 5.5 * 60 * 60 * 1000;
-    const istNow      = new Date(now.getTime() + istOffset);
-    const istTomorrow = new Date(istNow);
-    istTomorrow.setDate(istTomorrow.getDate() + 1);
-    const fmt        = (d) => `${d.getUTCFullYear()}-${pad(d.getUTCMonth()+1)}-${pad(d.getUTCDate())}`;
-    const dateFilter = `gte:${fmt(istNow)} 00:00:00;lte:${fmt(istTomorrow)} 00:00:00`;
+  // Parse: Label:SID:APIKey:APIToken;Label2:SID2:APIKey2:APIToken2
+  const accounts = accountsRaw.split(";").filter(Boolean).map((entry) => {
+    const parts = entry.split(":");
+    return {
+      label:     parts[0]?.trim(),
+      sid:       parts[1]?.trim(),
+      apiKey:    parts[2]?.trim(),
+      apiToken:  parts[3]?.trim(),
+    };
+  }).filter((a) => a.label && a.sid && a.apiKey && a.apiToken);
 
-    const baseUrl = `https://${subdomain}/v1/Accounts/${accountSid}/Calls.json`;
-    const auth    = { username: apiKey, password: apiToken };
-
-    let fetchedCalls = [];
-    let afterCursor  = null;
-    let page         = 1;
-    let totalCount   = 0;
-    const MAX_PAGES  = 50;
-
-    console.log(`[CDR] Fetching IST date: ${fmt(istNow)}...`);
-
-    while (page <= MAX_PAGES) {
-      let query = `PageSize=100&SortBy=DateCreated:desc&DateCreated=${encodeURIComponent(dateFilter)}`;
-      if (afterCursor) query += `&After=${encodeURIComponent(afterCursor)}`;
-
-      const res  = await axios.get(`${baseUrl}?${query}`, { auth, timeout: 15000 });
-      const data = res.data;
-
-      if (!data?.Calls?.length) {
-        console.log(`[CDR] Page ${page}: No more calls.`);
-        break;
-      }
-
-      if (page === 1) {
-        totalCount = data?.Metadata?.Total || 0;
-        console.log(`[CDR] Total today: ${totalCount}. Paginating...`);
-      }
-
-      fetchedCalls = [...fetchedCalls, ...data.Calls];
-      console.log(`[CDR] Page ${page}: ${data.Calls.length} calls (so far: ${fetchedCalls.length})`);
-
-      const nextUri = data?.Metadata?.NextPageUri;
-      if (!nextUri) {
-        console.log(`[CDR] Done. All ${fetchedCalls.length} fetched.`);
-        break;
-      }
-
-      const afterMatch = nextUri.match(/After=([^&]+)/);
-      if (!afterMatch) break;
-      afterCursor = decodeURIComponent(afterMatch[1]);
-      page++;
-      await sleep(300);
-    }
-
-    allCalls = fetchedCalls.map((c) => ({
-      sid:         c.Sid,
-      to:          c.To || "",
-      toClean:     cleanNumber(c.To),
-      from:        cleanNumber(c.From),
-      did:         cleanNumber(c.PhoneNumber),
-      status:      (c.Status || "").toLowerCase(),
-      direction:   (c.Direction || "").toLowerCase(),
-      startTime:   c.StartTime   ? new Date(c.StartTime)   : null,
-      endTime:     c.EndTime     ? new Date(c.EndTime)     : null,
-      duration:    parseInt(c.Duration || 0),
-      price:       parseFloat(c.Price   || 0),
-      dateCreated: c.DateCreated ? new Date(c.DateCreated) : null,
-      answeredBy:  c.AnsweredBy  || "",
-      isAgentCall: (c.To || "").toLowerCase().startsWith("sip:tr"),
-    }));
-
-    totalFetched = allCalls.length;
-    lastFetched  = new Date();
-    fetchError   = null;
-    console.log(`[CDR] Done! ${totalFetched} / ${totalCount} calls fetched.`);
-
-  } catch (err) {
-    fetchError = err.response
-      ? `HTTP ${err.response.status}: ${JSON.stringify(err.response.data)}`
-      : err.message;
-    console.error("[CDR] Fetch failed:", fetchError);
+  if (!accounts.length) {
+    console.log("[CDR] No valid accounts parsed from EXOTEL_ACCOUNTS.");
+    return;
   }
+
+  const subdomain = process.env.EXOTEL_SUBDOMAIN || "api.in.exotel.com";
+
+  // IST date range
+  const now         = new Date();
+  const istOffset   = 5.5 * 60 * 60 * 1000;
+  const istNow      = new Date(now.getTime() + istOffset);
+  const istTomorrow = new Date(istNow);
+  istTomorrow.setDate(istTomorrow.getDate() + 1);
+  const fmt        = (d) => `${d.getUTCFullYear()}-${pad(d.getUTCMonth()+1)}-${pad(d.getUTCDate())}`;
+  const dateFilter = `gte:${fmt(istNow)} 00:00:00;lte:${fmt(istTomorrow)} 00:00:00`;
+
+  console.log(`[CDR] Fetching IST date: ${fmt(istNow)} across ${accounts.length} account(s)...`);
+
+  let mergedCalls = [];
+  let anyError = null;
+
+  // Fetch each account sequentially (avoids rate limit issues across accounts)
+  for (const account of accounts) {
+    try {
+      const calls = await fetchAccountCDR(account, subdomain, dateFilter);
+      console.log(`[CDR] [${account.label}] fetched ${calls.length} calls`);
+      mergedCalls = [...mergedCalls, ...calls];
+    } catch (err) {
+      const msg = err.response
+        ? `HTTP ${err.response.status}: ${JSON.stringify(err.response.data)}`
+        : err.message;
+      console.error(`[CDR] [${account.label}] fetch failed:`, msg);
+      anyError = `${account.label}: ${msg}`;
+    }
+  }
+
+  allCalls     = mergedCalls;
+  totalFetched = allCalls.length;
+  lastFetched  = new Date();
+  fetchError   = anyError; // shows last error if any account failed, but still uses data from others
+
+  console.log(`[CDR] Done! Total merged calls across all accounts: ${totalFetched}`);
+}
+
+// ─── Fetch CDR for ONE account (with pagination) ─────────────────────────
+async function fetchAccountCDR(account, subdomain, dateFilter) {
+  const { label, sid, apiKey, apiToken } = account;
+  const baseUrl = `https://${subdomain}/v1/Accounts/${sid}/Calls.json`;
+  const auth    = { username: apiKey, password: apiToken };
+
+  let fetchedCalls = [];
+  let afterCursor  = null;
+  let page         = 1;
+  const MAX_PAGES  = 50;
+
+  while (page <= MAX_PAGES) {
+    let query = `PageSize=100&SortBy=DateCreated:desc&DateCreated=${encodeURIComponent(dateFilter)}`;
+    if (afterCursor) query += `&After=${encodeURIComponent(afterCursor)}`;
+
+    const res  = await axios.get(`${baseUrl}?${query}`, { auth, timeout: 15000 });
+    const data = res.data;
+
+    if (!data?.Calls?.length) break;
+
+    fetchedCalls = [...fetchedCalls, ...data.Calls];
+
+    const nextUri = data?.Metadata?.NextPageUri;
+    if (!nextUri) break;
+
+    const afterMatch = nextUri.match(/After=([^&]+)/);
+    if (!afterMatch) break;
+    afterCursor = decodeURIComponent(afterMatch[1]);
+    page++;
+    await sleep(300);
+  }
+
+  // Map and tag with account label
+  return fetchedCalls.map((c) => ({
+    sid:         c.Sid,
+    to:          c.To || "",
+    toClean:     cleanNumber(c.To),
+    from:        cleanNumber(c.From),
+    did:         cleanNumber(c.PhoneNumber),
+    status:      (c.Status || "").toLowerCase(),
+    direction:   (c.Direction || "").toLowerCase(),
+    startTime:   c.StartTime   ? new Date(c.StartTime)   : null,
+    endTime:     c.EndTime     ? new Date(c.EndTime)     : null,
+    duration:    parseInt(c.Duration || 0),
+    price:       parseFloat(c.Price   || 0),
+    dateCreated: c.DateCreated ? new Date(c.DateCreated) : null,
+    answeredBy:  c.AnsweredBy  || "",
+    isAgentCall: (c.To || "").toLowerCase().startsWith("sip:tr"),
+    account:     label,   // ← NEW: tag which account this call belongs to
+  }));
 }
 
 function sleep(ms)  { return new Promise((r) => setTimeout(r, ms)); }
