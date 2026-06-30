@@ -163,8 +163,6 @@ function getOverview() {
     fetchError,
   };
 }
-  };
-}
 
 function getClientStats() {
   const clientMap = parseClientMap();
