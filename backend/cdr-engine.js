@@ -142,6 +142,7 @@ function getOverview() {
   const live       = allCalls.filter((c) => c.status === "in-progress");
   const bd         = statusBreakdown(today);
   const agentCalls = today.filter((c) => c.isAgentCall);
+  const totalCost  = today.reduce((sum, c) => sum + (c.price || 0), 0);
   return {
     totalToday:   today.length,
     totalFetched,
@@ -156,8 +157,12 @@ function getOverview() {
     inbound:      today.filter((c) => c.direction === "inbound").length,
     outbound:     today.filter((c) => c.direction.includes("outbound")).length,
     agentCalls:   agentCalls.length,
+    totalCost:    parseFloat(totalCost.toFixed(2)),
+    avgCostPerCall: today.length ? parseFloat((totalCost / today.length).toFixed(2)) : 0,
     lastFetched,
     fetchError,
+  };
+}
   };
 }
 
