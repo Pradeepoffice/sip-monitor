@@ -224,10 +224,30 @@ function getDIDHealth() {
 
   today.forEach((c) => {
     if (!c.did) return;
-    if (!allowedDIDs.has(c.did)) return;  // ← Skip DIDs not in CLIENT_DID_MAP
+    if (!allowedDIDs.has(c.did)) return;  // Skip DIDs not in CLIENT_DID_MAP
     if (!didMap[c.did]) didMap[c.did] = [];
     didMap[c.did].push(c);
   });
+
+  return Object.entries(didMap).map(([did, calls]) => {
+    const bd         = statusBreakdown(calls);
+    const conn       = connectivity(calls);
+    const trunkId    = didTrunkMap[did];
+    const agentCalls = calls.filter((c) => trunkId ? c.to === trunkId : c.isAgentCall);
+    return {
+      did,
+      total:        calls.length,
+      connected:    bd["completed"] || 0,
+      failed:       (bd["failed"] || 0) + (bd["busy"] || 0) + (bd["no-answer"] || 0),
+      connectivity: conn,
+      avgDuration:  avgDuration(calls),
+      health:       conn >= 98 ? "GOOD" : conn >= 90 ? "WARNING" : "CRITICAL",
+      client:       getClientForDID(did),
+      agentCalls:   agentCalls.length,
+      trunkId:      trunkId || "",
+    };
+  }).sort((a, b) => a.connectivity - b.connectivity);
+}
 
 function getHourlyTraffic() {
   const today = callsToday();
