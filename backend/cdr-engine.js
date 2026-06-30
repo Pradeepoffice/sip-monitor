@@ -387,4 +387,4 @@ function getLiveStreams() {
   return liveStreamData;
 }
 
-module.exports = { fetchCDR, getAllStats, getOverview, checkAlertConditions };
+module.exports = { fetchCDR, getAllStats, getOverview, checkAlertConditions, fetchActiveStreams, getLiveStreams };
