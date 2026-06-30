@@ -370,41 +370,54 @@ function getAllStats() {
 // ─── Live Voicebot Streams ─────────────────────────────────────────────────
 let liveStreamData = { active: 0, limit: 0, utilization: 0, lastChecked: null, error: null };
 
+let liveStreamData = { active: 0, limit: 0, utilization: 0, lastChecked: null, error: null, byAccount: [] };
+
 async function fetchActiveStreams() {
-  const accountSid = process.env.EXOTEL_ACCOUNT_SID;
-  const apiKey     = process.env.EXOTEL_API_KEY;
-  const apiToken   = process.env.EXOTEL_API_TOKEN;
-  const subdomain  = process.env.EXOTEL_SUBDOMAIN || "api.in.exotel.com";
+  const accountsRaw = process.env.EXOTEL_ACCOUNTS || "";
+  if (!accountsRaw) return;
 
-  if (!accountSid || !apiKey || !apiToken) return;
+  const accounts = accountsRaw.split(";").filter(Boolean).map((entry) => {
+    const parts = entry.split(":");
+    return { label: parts[0]?.trim(), sid: parts[1]?.trim(), apiKey: parts[2]?.trim(), apiToken: parts[3]?.trim() };
+  }).filter((a) => a.label && a.sid && a.apiKey && a.apiToken);
 
-  try {
-    const url = `https://${subdomain}/v1/Accounts/${accountSid}/ActiveStreams`;
-    const res = await axios.get(url, {
-      auth: { username: apiKey, password: apiToken },
-      timeout: 10000,
-    });
+  const subdomain = process.env.EXOTEL_SUBDOMAIN || "api.in.exotel.com";
 
-    const xml = res.data;
-    const activeMatch = xml.match(/<ActiveStreamCount>(\d+)<\/ActiveStreamCount>/);
-    const limitMatch  = xml.match(/<ThrottleLimit>(\d+)<\/ThrottleLimit>/);
+  let totalActive = 0;
+  let totalLimit  = 0;
+  const byAccount = [];
 
-    const active = activeMatch ? parseInt(activeMatch[1]) : 0;
-    const limit  = limitMatch  ? parseInt(limitMatch[1])  : 0;
+  for (const account of accounts) {
+    try {
+      const url = `https://${subdomain}/v1/Accounts/${account.sid}/ActiveStreams`;
+      const res = await axios.get(url, {
+        auth: { username: account.apiKey, password: account.apiToken },
+        timeout: 10000,
+      });
+      const xml = res.data;
+      const activeMatch = xml.match(/<ActiveStreamCount>(\d+)<\/ActiveStreamCount>/);
+      const limitMatch  = xml.match(/<ThrottleLimit>(\d+)<\/ThrottleLimit>/);
+      const active = activeMatch ? parseInt(activeMatch[1]) : 0;
+      const limit  = limitMatch  ? parseInt(limitMatch[1])  : 0;
 
-    liveStreamData = {
-      active,
-      limit,
-      utilization: limit ? parseFloat(((active / limit) * 100).toFixed(1)) : 0,
-      lastChecked: new Date().toISOString(),
-      error: null,
-    };
-
-    console.log(`[STREAMS] Active: ${active} / ${limit} (${liveStreamData.utilization}%)`);
-  } catch (err) {
-    liveStreamData.error = err.message;
-    console.error("[STREAMS] Fetch failed:", err.message);
+      totalActive += active;
+      totalLimit  += limit;
+      byAccount.push({ label: account.label, active, limit });
+    } catch (err) {
+      byAccount.push({ label: account.label, active: 0, limit: 0, error: err.message });
+    }
   }
+
+  liveStreamData = {
+    active: totalActive,
+    limit: totalLimit,
+    utilization: totalLimit ? parseFloat(((totalActive / totalLimit) * 100).toFixed(1)) : 0,
+    lastChecked: new Date().toISOString(),
+    error: null,
+    byAccount,
+  };
+
+  console.log(`[STREAMS] Total Active: ${totalActive} / ${totalLimit} (${liveStreamData.utilization}%)`);
 }
 
 function getLiveStreams() {
