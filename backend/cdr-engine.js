@@ -333,6 +333,7 @@ function getClientForDID(did) {
 function getAllStats() {
   return {
     overview:  getOverview(),
+    liveStreams: getLiveStreams(),
     clients:   getClientStats(),
     didHealth: getDIDHealth(),
     hourly:    getHourlyTraffic(),
