@@ -368,7 +368,6 @@ function getAllStats() {
   };
 }
 // ─── Live Voicebot Streams ─────────────────────────────────────────────────
-let liveStreamData = { active: 0, limit: 0, utilization: 0, lastChecked: null, error: null };
 
 let liveStreamData = { active: 0, limit: 0, utilization: 0, lastChecked: null, error: null, byAccount: [] };
 
