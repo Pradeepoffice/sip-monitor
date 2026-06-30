@@ -69,12 +69,19 @@ export default function App() {
   const [lastUpdate, setLastUpdate] = useState(null);
   const [alertsOpen, setAlertsOpen] = useState(false);
 
-  const fetchAll = useCallback(async () => {
+ const fetchAll = useCallback(async () => {
     try {
-      const [c, a] = await Promise.all([
+      const [c, a, live] = await Promise.all([
         fetch(`${API}/api/cdr/stats`).then((r) => r.json()),
         fetch(`${API}/api/alerts`).then((r) => r.json()),
+        fetch(`${API}/api/cdr/live`).then((r) => r.json()),
       ]);
+      c.overview = {
+        ...c.overview,
+        liveActive: live.active,
+        liveLimit: live.limit,
+        liveUtilization: live.utilization,
+      };
       setStats(c);
       setAlerts(a.alerts || []);
       setLastUpdate(new Date());
@@ -193,6 +200,7 @@ function OverviewTab({ ov }) {
         <KPICard label="Inbound"      value={num(ov.inbound)}        color={C.blue}   icon="📥" />
         <KPICard label="Outbound"     value={num(ov.outbound)}       color={C.purple} icon="📤" />
         <KPICard label="In Progress"  value={num(ov.inProgress)}     color={C.yellow} icon="🔄" />
+        <KPICard label="Live Voicebot Calls" value={num(ov.liveActive)} color={C.purple} icon="🤖" sub={ov.liveLimit ? `${ov.liveUtilization}% of ${ov.liveLimit} capacity` : ""} />
         <KPICard label="Avg Duration" value={fmtSec(ov.avgDuration)} color={C.purple} icon="⏱" />
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
