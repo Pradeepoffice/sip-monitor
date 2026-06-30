@@ -4,7 +4,7 @@ const express = require("express");
 const cors = require("cors");
 const { pingSipEndpoint } = require("./sip-pinger");
 const { triggerAlerts, triggerCDRAlerts } = require("./alert-manager");
-const { fetchCDR, getAllStats, checkAlertConditions } = require("./cdr-engine");
+const { fetchCDR, getAllStats, checkAlertConditions, fetchActiveStreams } = require("./cdr-engine");
 
 const app = express();
 app.use(cors());
@@ -57,6 +57,11 @@ const SIP_INTERVAL  = parseInt(process.env.CHECK_INTERVAL || "30") * 1000;
 const CDR_INTERVAL  = parseInt(process.env.CDR_INTERVAL   || "300") * 1000; // 5 mins
 
 setInterval(runCDRCheck, CDR_INTERVAL);
+setInterval(fetchActiveStreams, 15000); // every 15 sec — live data
+
+// Startup
+runCDRCheck();
+fetchActiveStreams();
 
 // Startup
 runCDRCheck();
@@ -79,7 +84,7 @@ app.get("/api/cdr/clients",     (req, res) => res.json(getAllStats().clients));
 app.get("/api/cdr/did-health",  (req, res) => res.json(getAllStats().didHealth));
 app.get("/api/cdr/hourly",      (req, res) => res.json(getAllStats().hourly));
 app.get("/api/cdr/failures",    (req, res) => res.json(getAllStats().failures));
-app.get("/api/cdr/kpi",         (req, res) => res.json(getAllStats().kpi));
+app.get("/api/cdr/live",        (req, res) => res.json(getAllStats().liveStreams));
 
 // All alerts combined
 app.get("/api/alerts", (req, res) => {
